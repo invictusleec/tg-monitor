@@ -40,14 +40,16 @@ if missing:
     ]
     subprocess.run(cmd, check=False)
 else:
-    # 环境齐全：初始化并并行启动监控、前台（可选后台）
-    run_mode = os.environ.get("RUN_MODE", "full")  # full / ui
+    # 环境齐全：根据 RUN_MODE 决定启动
+    run_mode = os.environ.get("RUN_MODE", "full").lower()  # full / ui
     if run_mode == "ui":
+        # 只启动前台 UI（用于调试或轻量模式）
         subprocess.run([
             "bash", "-lc",
             "streamlit run web.py --server.port 8501 --server.address 0.0.0.0"
         ], check=False)
     else:
+        # 启动：初始化 -> 监控 + 前台 + 后台
         subprocess.run([
             "bash", "-lc",
             "python init_db.py && (python monitor.py & streamlit run web.py --server.port 8501 --server.address 0.0.0.0 & streamlit run 后台.py --server.port 8502 --server.address 0.0.0.0 & wait)"

@@ -13,11 +13,11 @@ class Settings(BaseSettings):
     STRING_SESSION: str | None = None  # 可选的StringSession，来自.env
     EXPORT_STRING_SESSION: str | None = None  # 专用于导出任务的 StringSession，避免与其他进程冲突
 
-    # 数据库配置
+    # 数据库配置（只强制需要 DATABASE_URL，POSTGRES_* 仅用于可选的内置DB场景）
     DATABASE_URL: str
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
+    POSTGRES_USER: str | None = None
+    POSTGRES_PASSWORD: str | None = None
+    POSTGRES_DB: str | None = None
 
     # 默认频道配置
     DEFAULT_CHANNELS: str
