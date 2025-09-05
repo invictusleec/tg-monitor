@@ -7,9 +7,9 @@ ENV PIP_NO_CACHE_DIR=1 \
 
 WORKDIR /app
 
-# System deps for psycopg2
+# System deps for psycopg2 and shell utilities
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev curl ca-certificates && \
+    bash build-essential libpq-dev curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python deps first (better layer caching)
