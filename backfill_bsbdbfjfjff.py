@@ -1,12 +1,32 @@
+import json
+import datetime
+from datetime import timezone, timedelta
+import re
+from typing import Dict, Any, List, Optional
+
 from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, cast, String
-from model import Message, engine, ChannelRule, create_tables
+
 from config import settings
-import datetime
-import re
-import sys
+from model import Message, engine, ChannelRule, create_tables
+
+# 北京时间时区
+BEIJING_TZ = timezone(timedelta(hours=8))
+
+def get_beijing_time():
+    """获取当前北京时间"""
+    return datetime.datetime.now(BEIJING_TZ).replace(tzinfo=None)
+
+def to_beijing_time(dt):
+    """将 datetime 对象转换为北京时间"""
+    if dt is None:
+        return get_beijing_time()
+    if dt.tzinfo is None:
+        # 假设输入是 UTC 时间
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(BEIJING_TZ).replace(tzinfo=None)
 
 # ------------------------ 规则缓存与判断 ------------------------
 RULES_CACHE = {}
@@ -251,7 +271,7 @@ def main():
                 skipped_non_netdisk += 1
                 continue
 
-            ts = getattr(message, 'date', None) or datetime.datetime.utcnow()
+            ts = to_beijing_time(getattr(message, 'date', None)) or get_beijing_time()
             with Session(engine) as session:
                 r = upsert_message_by_links(session, parsed, ts)
                 if r == 'updated':

@@ -3,6 +3,19 @@ from model import Message, engine
 import datetime
 import re
 import os
+import datetime
+from datetime import timezone, timedelta
+import json
+from sqlalchemy.orm import Session
+from model import Message, engine, create_tables
+from config import settings
+
+# 北京时间时区
+BEIJING_TZ = timezone(timedelta(hours=8))
+
+def get_beijing_time():
+    """获取当前北京时间"""
+    return datetime.datetime.now(BEIJING_TZ).replace(tzinfo=None)
 
 def parse_quark_link(line):
     """解析夸克网盘链接行"""
@@ -70,8 +83,8 @@ def import_from_file(file_path, channel_name='imported_data'):
                     links={'quark': parsed['link']},
                     tags=['导入数据'],
                     source='file_import',
-                    timestamp=datetime.datetime.utcnow(),
-                    created_at=datetime.datetime.utcnow()
+                    timestamp=get_beijing_time(),
+            created_at=get_beijing_time()
                 )
                 
                 session.add(message)
@@ -157,8 +170,8 @@ def create_sample_data():
                     links=data['links'],
                     tags=data['tags'],
                     source='sample_data',
-                    timestamp=datetime.datetime.utcnow(),
-                    created_at=datetime.datetime.utcnow()
+                    timestamp=get_beijing_time(),
+            created_at=get_beijing_time()
                 )
                 
                 session.add(message)

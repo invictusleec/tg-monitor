@@ -4,11 +4,28 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, cast, String
 from model import Message, engine, Channel, Credential, TelegramConfig, ChannelRule, create_tables
 import datetime
+from datetime import timezone, timedelta
 import json
 import re
 import sys
 import os
 from config import settings
+
+# 北京时间时区
+BEIJING_TZ = timezone(timedelta(hours=8))
+
+def get_beijing_time():
+    """获取当前北京时间"""
+    return datetime.datetime.now(BEIJING_TZ).replace(tzinfo=None)
+
+def to_beijing_time(dt):
+    """将 datetime 对象转换为北京时间"""
+    if dt is None:
+        return get_beijing_time()
+    if dt.tzinfo is None:
+        # 假设输入是 UTC 时间
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(BEIJING_TZ).replace(tzinfo=None)
 
 def get_api_credentials():
     """获取 API 凭据，优先使用数据库中的凭据"""
@@ -379,7 +396,7 @@ async def on_new_message(event):
 
     message = event.raw_text
     # 在处理新消息处，统一使用UTC时间
-    timestamp = datetime.datetime.utcnow()
+    timestamp = get_beijing_time()
     
     # 解析消息
     parsed_data = parse_message(message)
@@ -556,7 +573,7 @@ async def backfill_channel(channel_username: str):
             parsed['channel'] = uname
             if should_drop_by_rules(uname, parsed):
                 continue
-            ts = getattr(msg, 'date', None) or datetime.datetime.utcnow()
+            ts = to_beijing_time(getattr(msg, 'date', None)) or get_beijing_time()
             with Session(engine) as session:
                 r = upsert_message_by_links(session, parsed, ts)
                 if r == 'updated':

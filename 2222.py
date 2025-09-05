@@ -1,7 +1,8 @@
 import json
 import datetime
+from datetime import timezone, timedelta
 import re
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
@@ -10,6 +11,22 @@ from sqlalchemy import or_, cast, String
 
 from config import settings
 from model import Message, engine, ChannelRule, create_tables
+
+# 北京时间时区
+BEIJING_TZ = timezone(timedelta(hours=8))
+
+def get_beijing_time():
+    """获取当前北京时间"""
+    return datetime.datetime.now(BEIJING_TZ).replace(tzinfo=None)
+
+def to_beijing_time(dt):
+    """将 datetime 对象转换为北京时间"""
+    if dt is None:
+        return get_beijing_time()
+    if dt.tzinfo is None:
+        # 假设输入是 UTC 时间
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(BEIJING_TZ).replace(tzinfo=None)
 
 # ------------------------ 规则缓存与判断 ------------------------
 RULES_CACHE = {}
@@ -269,11 +286,11 @@ def import_from_txt(input_path: str):
                 ts = None
                 if obj.get('date'):
                     try:
-                        ts = datetime.datetime.fromisoformat(obj['date'])
+                        ts = to_beijing_time(datetime.datetime.fromisoformat(obj['date']))
                     except Exception:
                         pass
                 if not ts:
-                    ts = datetime.datetime.utcnow()
+                    ts = get_beijing_time()
 
                 urls = set((parsed.get('links') or {}).values())
                 target_id = None
@@ -301,14 +318,14 @@ def import_from_txt(input_path: str):
                             link_index[u] = target.id
                     else:
                         # 异常情况：索引存在但找不到记录，走插入
-                        m = Message(timestamp=ts, **parsed)
+                        m = Message(timestamp=ts, created_at=ts, **parsed)
                         batch_add.append(m)
                         for u in urls:
                             link_index[u] = -1  # 占位，commit后更新
                         inserted += 1
                 else:
                     # 插入路径
-                    m = Message(timestamp=ts, **parsed)
+                    m = Message(timestamp=ts, created_at=ts, **parsed)
                     batch_add.append(m)
                     for u in urls:
                         link_index[u] = -1
