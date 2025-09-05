@@ -45,6 +45,7 @@ docker compose up -d
 - `STRING_SESSION`: Telegram 登录会话（可选）
 - `DEFAULT_CHANNELS`: 默认监控频道列表
 
+
 ## 许可证
 
 Private Repository
