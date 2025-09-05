@@ -357,3 +357,42 @@ with Session(engine) as session:
                 if st.button('下一页', disabled=rules_page_num==max_rules_page, key='rules_next_page'):
                     st.session_state['rules_page_num'] = min(max_rules_page, rules_page_num+1)
                     st.rerun()
+
+# ▶️⏸ 监控开关（无重启）
+st.header("监控运行控制（无重启）")
+CONTROL_FILE = "monitor_control.json"
+
+def read_paused():
+    try:
+        if os.path.exists(CONTROL_FILE):
+            import json
+            with open(CONTROL_FILE, "r", encoding="utf-8") as f:
+                return bool(json.load(f).get("paused", False))
+    except Exception:
+        pass
+    return False
+
+paused = read_paused()
+colp, colr = st.columns([1,2])
+with colp:
+    st.write(f"当前状态：{'⏸ 已暂停' if paused else '▶️ 运行中'}")
+with colr:
+    c1, c2 = st.columns(2)
+    if c1.button("暂停监控", disabled=paused):
+        try:
+            with open(CONTROL_FILE, "w", encoding="utf-8") as f:
+                json.dump({"paused": True}, f, ensure_ascii=False)
+            st.success("已暂停（无需重启）")
+        except Exception as e:
+            st.error(f"操作失败: {e}")
+        st.rerun()
+    if c2.button("恢复监控", disabled=not paused):
+        try:
+            with open(CONTROL_FILE, "w", encoding="utf-8") as f:
+                json.dump({"paused": False}, f, ensure_ascii=False)
+            st.success("已恢复（无需重启）")
+        except Exception as e:
+            st.error(f"操作失败: {e}")
+        st.rerun()
+
+st.markdown("---")

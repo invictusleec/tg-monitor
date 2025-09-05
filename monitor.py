@@ -80,6 +80,26 @@ channel_usernames = get_channels()
 # 规则缓存：{channel: {exclude_netdisks:set, exclude_keywords:[lower], exclude_tags:set}}
 RULES_CACHE = {}
 
+# —— 无重启控制：通过控制文件动态暂停/恢复 ——
+IS_PAUSED = False
+CONTROL_FILE = "monitor_control.json"
+
+def load_control_state():
+    """从控制文件读取 paused 状态，变化时打印提示"""
+    global IS_PAUSED
+    try:
+        paused = False
+        if os.path.exists(CONTROL_FILE):
+            with open(CONTROL_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                paused = bool(data.get("paused", False))
+    except Exception as e:
+        print(f"⚠️ 读取控制文件失败: {e}")
+        paused = False
+    if paused != IS_PAUSED:
+        IS_PAUSED = paused
+        print("⏸ 已暂停监控（无重启）" if IS_PAUSED else "▶️ 已恢复监控（无重启）")
+
 def load_rules_cache():
     global RULES_CACHE
     try:
@@ -316,6 +336,9 @@ def upsert_message_by_links(session: Session, parsed_data: dict, timestamp: date
     return "inserted"
 
 async def on_new_message(event):
+    # 无重启暂停：如被暂停则直接忽略消息
+    if IS_PAUSED:
+        return
     # 先过滤“回复类”消息（对某条消息的评论/回复），这些往往不是我们要采集的原始推送
     try:
         msg_obj = getattr(event, 'message', None)
@@ -405,6 +428,8 @@ async def channels_watcher(poll_sec: int = 1):
     FLAG_RULES = "rules_refresh.flag"
     while True:
         try:
+            # 动态读取控制文件（暂停/恢复）
+            load_control_state()
             # 频道刷新
             if os.path.exists(FLAG_CH):
                 await bind_channels()
