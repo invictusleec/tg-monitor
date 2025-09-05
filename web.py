@@ -142,18 +142,8 @@ for msg in messages_page:
         netdisk_tags = " ".join([f"🔵[{name}]" for name in msg.links.keys()])
     else:
         netdisk_tags = ""
-    # 本地时区（中国大陆，UTC+8）
-    LOCAL_TZ = timezone(timedelta(hours=8))
-    
-    def to_local(dt: datetime) -> datetime:
-        if dt is None:
-            return None
-        # 数据库存储为UTC的naive时间，这里视为UTC并转换为本地时区
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(LOCAL_TZ)
-    
-    local_ts = to_local(msg.timestamp)
+    # 数据库现在存储的是北京时间，直接使用即可
+    local_ts = msg.timestamp
     expander_title = f"{msg.title} - 🕒{local_ts.strftime('%Y-%m-%d %H:%M:%S')}  {netdisk_tags}"
     with st.expander(expander_title):
         if msg.description:
