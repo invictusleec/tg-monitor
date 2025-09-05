@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from model import Message, engine
 import pandas as pd
 from datetime import datetime, timedelta
-from config import settings
 from collections import Counter
 from sqlalchemy import or_, cast, String
 import json
@@ -59,7 +58,7 @@ st.session_state['selected_tags'] = selected_tags
 
 # 网盘类型筛选
 netdisk_types = ['夸克网盘', '阿里云盘', '百度网盘', '115网盘', '天翼云盘', '123云盘', 'UC网盘', '迅雷']
-st.selected_netdisks = st.sidebar.multiselect("网盘类型", netdisk_types)
+selected_netdisks = st.sidebar.multiselect("网盘类型", netdisk_types)
 
 # 关键词模糊搜索（带搜索按钮）
 if 'search_query' not in st.session_state:
@@ -93,14 +92,13 @@ page_num = st.session_state['page_num']
 # 构建查询（服务端分页 + SQL端过滤）
 with Session(engine) as session:
     query = session.query(Message)
-    # 应用时间范围过滤（存储为UTC）
-    now_utc = datetime.utcnow()
+    # 应用时间范围过滤
     if time_range == "最近24小时":
-        query = query.filter(Message.timestamp >= now_utc - timedelta(days=1))
+        query = query.filter(Message.timestamp >= datetime.now() - timedelta(days=1))
     elif time_range == "最近7天":
-        query = query.filter(Message.timestamp >= now_utc - timedelta(days=7))
+        query = query.filter(Message.timestamp >= datetime.now() - timedelta(days=7))
     elif time_range == "最近30天":
-        query = query.filter(Message.timestamp >= now_utc - timedelta(days=30))
+        query = query.filter(Message.timestamp >= datetime.now() - timedelta(days=30))
     # 应用标签过滤
     if selected_tags:
         filters = [Message.tags.any(tag) for tag in selected_tags]
@@ -120,8 +118,8 @@ with Session(engine) as session:
                 )
             )
     # 网盘类型在 SQL 侧过滤（无 JSONB：退化为字符串包含）
-    if st.selected_netdisks:
-        exprs = [cast(Message.links, String).ilike(f'%"{nd}"%') for nd in st.selected_netdisks]
+    if selected_netdisks:
+        exprs = [cast(Message.links, String).ilike(f'%"{nd}"%') for nd in selected_netdisks]
         query = query.filter(or_(*exprs))
 
     # 统计总数并计算分页
@@ -137,9 +135,6 @@ with Session(engine) as session:
     start_idx = (page_num - 1) * PAGE_SIZE
     messages_page = query.order_by(Message.timestamp.desc()).offset(start_idx).limit(PAGE_SIZE).all()
 
-# 时区偏移（用于展示本地时间）
-offset = timedelta(hours=getattr(settings, 'TIME_OFFSET_HOURS', 8) or 0)
-
 # 显示消息列表（分页后）
 for msg in messages_page:
     # 标题行保留网盘标签，用特殊符号区分
@@ -147,9 +142,7 @@ for msg in messages_page:
         netdisk_tags = " ".join([f"🔵[{name}]" for name in msg.links.keys()])
     else:
         netdisk_tags = ""
-    # 展示本地时间（UTC + 偏移），数据库里是UTC无时区
-    ts_local = (msg.timestamp + offset) if isinstance(msg.timestamp, datetime) else msg.timestamp
-    expander_title = f"{msg.title} - 🕒{ts_local.strftime('%Y-%m-%d %H:%M:%S')}  {netdisk_tags}"
+    expander_title = f"{msg.title} - 🕒{msg.timestamp.strftime('%Y-%m-%d %H:%M:%S')}  {netdisk_tags}"
     with st.expander(expander_title):
         if msg.description:
             st.markdown(msg.description)
@@ -217,21 +210,23 @@ import hashlib as _hashlib
 _filter_state = {
     'time_range': time_range,
     'selected_tags': sorted(st.session_state.get('selected_tags', [])),
-    'selected_netdisks': sorted(st.selected_netdisks),
+    'selected_netdisks': sorted(selected_netdisks),
     'search_query': st.session_state.get('search_query', ''),
 }
 _filter_sig = _hashlib.md5(json.dumps(_filter_state, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
 _prev_filter_sig = st.session_state.get('filter_sig')
 if _prev_filter_sig != _filter_sig:
+    # 筛选条件发生变化，重置分页并记录签名
     st.session_state['page_num'] = 1
     st.session_state['filter_sig'] = _filter_sig
-    st.rerun()
+    # 本次为交互变更，直接返回（不sleep），让界面立即更新
+    # 注意：Streamlit会在下一次空闲渲染时再进入自动刷新
 else:
-    # 若筛选未变化，则进入“UI状态”级的刷新（包括页码），无交互时按间隔刷新
+    # 用于判断交互是否发生（含分页在内的任何变化），变化时不sleep
     _ui_state = {
         'time_range': time_range,
         'selected_tags': sorted(st.session_state.get('selected_tags', [])),
-        'selected_netdisks': sorted(st.selected_netdisks),
+        'selected_netdisks': sorted(selected_netdisks),
         'page_num': st.session_state.get('page_num', 1),
         'search_query': st.session_state.get('search_query', ''),
     }
@@ -239,13 +234,14 @@ else:
     _prev_ui_sig = st.session_state.get('ui_sig')
     if _prev_ui_sig != _ui_sig:
         st.session_state['ui_sig'] = _ui_sig
+        # 本次为交互变更，直接返回（不sleep）
     else:
-        # 无任何交互变化，按设定的间隔刷新
+        # 无交互发生，进入自动拉取模式：sleep后自动重跑
         import time as _time
         _time.sleep(interval)
         st.rerun()
 
-# 样式调整
+# 添加全局CSS，强力覆盖expander内容区的gap，只保留一处，放在文件最后
 st.markdown("""
     <style>
     [data-testid=\"stExpander\"] [data-testid=\"stExpanderContent\"] {

@@ -9,7 +9,6 @@ class Message(Base):
     __tablename__ = "messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    # 约定：UTC无tzinfo的时间戳
     timestamp = Column(DateTime, nullable=False)
     title = Column(String)
     description = Column(String)
@@ -19,7 +18,6 @@ class Message(Base):
     channel = Column(String)  # 频道
     group_name = Column(String)  # 群组
     bot = Column(String)  # 机器人
-    # 统一为UTC无tzinfo
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Credential(Base):

@@ -22,9 +22,6 @@ class Settings(BaseSettings):
     # 默认频道配置
     DEFAULT_CHANNELS: str
 
-    # 前端时间显示偏移（小时），用于将存储的UTC时间换算为本地显示时间；默认 +8（Asia/Shanghai）
-    TIME_OFFSET_HOURS: int = 8
-
     # 日志级别
     LOG_LEVEL: str = "INFO"
 
