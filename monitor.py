@@ -366,14 +366,24 @@ async def on_new_message(event):
         return
 
     message = event.raw_text
-    # 统一使用 Telegram 消息本身的时间（UTC），如缺失则退化为当前UTC
-    try:
-        evt_msg = getattr(event, 'message', None)
-        evt_dt = getattr(evt_msg, 'date', None)
-    except Exception:
-        evt_dt = None
-    timestamp = _to_utc_naive(evt_dt or datetime.datetime.utcnow())
-    
+-    timestamp = datetime.datetime.now()
++    # 统一使用 UTC 时间存储，避免容器本地时区差异导致的时间偏差
++    timestamp = datetime.datetime.utcnow()
++    # 使用消息本身的时间（Telethon 提供 tz-aware UTC），统一转为 UTC 无时区存储
++    timestamp = None
++    try:
++        _msg = getattr(event, 'message', None)
++        if _msg is not None and getattr(_msg, 'date', None) is not None:
++            ts = _msg.date
++            if isinstance(ts, datetime.datetime) and ts.tzinfo is not None:
++                timestamp = ts.astimezone(datetime.timezone.utc).replace(tzinfo=None)
++            else:
++                timestamp = ts
++    except Exception:
++        timestamp = None
++    if timestamp is None:
++        # 兜底：采用当前UTC时间
++        timestamp = datetime.datetime.utcnow()
     # 解析消息
     parsed_data = parse_message(message)
 
@@ -516,7 +526,7 @@ async def backfill_channel(channel_username: str):
             parsed['channel'] = uname
             if should_drop_by_rules(uname, parsed):
                 continue
-            ts = _to_utc_naive(getattr(msg, 'date', None) or datetime.datetime.utcnow())
+            ts = getattr(msg, 'date', None) or datetime.datetime.utcnow()
             with Session(engine) as session:
                 r = upsert_message_by_links(session, parsed, ts)
                 if r == 'updated':
@@ -581,13 +591,3 @@ if __name__ == "__main__":
     else:
         import asyncio
         asyncio.run(start_monitoring())
-
-
-def _to_utc_naive(dt: datetime.datetime) -> datetime.datetime:
-    """将任意datetime统一为“UTC无tzinfo”的标准形式，便于数据库一致存储。"""
-    if dt is None:
-        return datetime.datetime.utcnow()
-    if getattr(dt, 'tzinfo', None) is not None:
-        return dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
-    # 认为是无tz的UTC时间
-    return dt
