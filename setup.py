@@ -35,7 +35,7 @@ with st.form("setup-form", clear_on_submit=False):
         TELEGRAM_API_ID = st.text_input("TELEGRAM_API_ID", value=existing.get("TELEGRAM_API_ID", ""))
         TELEGRAM_API_HASH = st.text_input("TELEGRAM_API_HASH", value=existing.get("TELEGRAM_API_HASH", ""))
     with col2:
-        DEFAULT_CHANNELS = st.text_input("DEFAULT_CHANNELS (逗号分隔)", value=existing.get("DEFAULT_CHANNELS", ""))
+        DEFAULT_CHANNELS = st.text_input("DEFAULT_CHANNELS (逗号分隔)", value=existing.get("DEFAULT_CHANNELS", "BaiduCloudDisk,tianyirigeng,Aliyun_4K_Movies"))
         RUN_MODE = st.selectbox("RUN_MODE", ["full", "ui"], index=0 if existing.get("RUN_MODE", "full") == "full" else 1)
 
     st.divider()
