@@ -22,5 +22,5 @@ COPY . /app
 # Expose UI ports (Streamlit web.py / 后台.py)
 EXPOSE 8501 8502
 
-# Default command (can be overridden by docker-compose)
-CMD ["bash", "-lc", "streamlit run web.py --server.port 8501 --server.address 0.0.0.0"]
+# Default command: boot script will decide to show setup page or run full app
+CMD ["python", "boot.py"]
