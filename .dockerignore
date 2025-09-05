@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite
+*.db
+.env
+monitor_session.session
+newquark_session.session
+session.session
+pgdata/
+*.log
+.cache/
+.streamlit/
+.idea/
+.vscode/
