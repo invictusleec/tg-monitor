@@ -366,24 +366,21 @@ async def on_new_message(event):
         return
 
     message = event.raw_text
--    timestamp = datetime.datetime.now()
-+    # 统一使用 UTC 时间存储，避免容器本地时区差异导致的时间偏差
-+    timestamp = datetime.datetime.utcnow()
-+    # 使用消息本身的时间（Telethon 提供 tz-aware UTC），统一转为 UTC 无时区存储
-+    timestamp = None
-+    try:
-+        _msg = getattr(event, 'message', None)
-+        if _msg is not None and getattr(_msg, 'date', None) is not None:
-+            ts = _msg.date
-+            if isinstance(ts, datetime.datetime) and ts.tzinfo is not None:
-+                timestamp = ts.astimezone(datetime.timezone.utc).replace(tzinfo=None)
-+            else:
-+                timestamp = ts
-+    except Exception:
-+        timestamp = None
-+    if timestamp is None:
-+        # 兜底：采用当前UTC时间
-+        timestamp = datetime.datetime.utcnow()
+    # 使用消息本身的时间（Telethon 提供 tz-aware UTC），统一转为 UTC 无时区存储
+    timestamp = None
+    try:
+        _msg = getattr(event, 'message', None)
+        if _msg is not None and getattr(_msg, 'date', None) is not None:
+            ts = _msg.date
+            if isinstance(ts, datetime.datetime) and ts.tzinfo is not None:
+                timestamp = ts.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+            else:
+                timestamp = ts
+    except Exception:
+        timestamp = None
+    if timestamp is None:
+        # 兜底：采用当前UTC时间
+        timestamp = datetime.datetime.utcnow()
     # 解析消息
     parsed_data = parse_message(message)
 
