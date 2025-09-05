@@ -1,8 +1,9 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from sqlalchemy.orm import Session
 from model import Message, engine
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import Counter
 from sqlalchemy import or_, cast, String
 import json
@@ -23,6 +24,17 @@ st.title("📱 TG频道监控")
 
 # 创建侧边栏
 st.sidebar.header("筛选条件")
+
+# 本地显示时区（中国大陆：UTC+8）。数据库统一按UTC无tzinfo存储。
+LOCAL_TZ = timezone(timedelta(hours=8))
+
+def utc_to_local_str(dt: datetime) -> str:
+    if not dt:
+        return ""
+    # 将“无tz的UTC”或“任意tz”的时间统一转换为本地时区显示
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(LOCAL_TZ).strftime('%Y-%m-%d %H:%M:%S')
 
 # 时间范围选择
 time_range = st.sidebar.selectbox(
@@ -92,13 +104,13 @@ page_num = st.session_state['page_num']
 # 构建查询（服务端分页 + SQL端过滤）
 with Session(engine) as session:
     query = session.query(Message)
-    # 应用时间范围过滤
+    # 应用时间范围过滤（数据库以UTC存储，这里用utcnow做比较更准确）
     if time_range == "最近24小时":
-        query = query.filter(Message.timestamp >= datetime.now() - timedelta(days=1))
+        query = query.filter(Message.timestamp >= datetime.utcnow() - timedelta(days=1))
     elif time_range == "最近7天":
-        query = query.filter(Message.timestamp >= datetime.now() - timedelta(days=7))
+        query = query.filter(Message.timestamp >= datetime.utcnow() - timedelta(days=7))
     elif time_range == "最近30天":
-        query = query.filter(Message.timestamp >= datetime.now() - timedelta(days=30))
+        query = query.filter(Message.timestamp >= datetime.utcnow() - timedelta(days=30))
     # 应用标签过滤
     if selected_tags:
         filters = [Message.tags.any(tag) for tag in selected_tags]
@@ -142,7 +154,8 @@ for msg in messages_page:
         netdisk_tags = " ".join([f"🔵[{name}]" for name in msg.links.keys()])
     else:
         netdisk_tags = ""
-    expander_title = f"{msg.title} - 🕒{msg.timestamp.strftime('%Y-%m-%d %H:%M:%S')}  {netdisk_tags}"
+    local_time_str = utc_to_local_str(msg.timestamp)
+    expander_title = f"{msg.title} - 🕒{local_time_str}  {netdisk_tags}"
     with st.expander(expander_title):
         if msg.description:
             st.markdown(msg.description)
@@ -182,7 +195,7 @@ if 'tag_click' in st.session_state and st.session_state['tag_click']:
         st.rerun()
     st.session_state['tag_click'] = None
 
-# 添加自动刷新与说明
+# 添加自动刷新与说明（使用客户端JS定时刷新，避免服务端sleep导致上游超时）
 st.empty()
 st.markdown("---")
 
@@ -203,43 +216,15 @@ def get_refresh_interval(default: int = 60) -> int:
 interval = get_refresh_interval()
 st.markdown(f"页面每{interval}秒自动刷新一次")
 
-# 交互无阻塞刷新：当筛选或分页变化时，跳过sleep，立即完成本次渲染
-import hashlib as _hashlib
-
-# 仅用于判断筛选是否变化（不含分页），变化时重置到第1页
-_filter_state = {
-    'time_range': time_range,
-    'selected_tags': sorted(st.session_state.get('selected_tags', [])),
-    'selected_netdisks': sorted(selected_netdisks),
-    'search_query': st.session_state.get('search_query', ''),
-}
-_filter_sig = _hashlib.md5(json.dumps(_filter_state, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
-_prev_filter_sig = st.session_state.get('filter_sig')
-if _prev_filter_sig != _filter_sig:
-    # 筛选条件发生变化，重置分页并记录签名
-    st.session_state['page_num'] = 1
-    st.session_state['filter_sig'] = _filter_sig
-    # 本次为交互变更，直接返回（不sleep），让界面立即更新
-    # 注意：Streamlit会在下一次空闲渲染时再进入自动刷新
-else:
-    # 用于判断交互是否发生（含分页在内的任何变化），变化时不sleep
-    _ui_state = {
-        'time_range': time_range,
-        'selected_tags': sorted(st.session_state.get('selected_tags', [])),
-        'selected_netdisks': sorted(selected_netdisks),
-        'page_num': st.session_state.get('page_num', 1),
-        'search_query': st.session_state.get('search_query', ''),
-    }
-    _ui_sig = _hashlib.md5(json.dumps(_ui_state, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
-    _prev_ui_sig = st.session_state.get('ui_sig')
-    if _prev_ui_sig != _ui_sig:
-        st.session_state['ui_sig'] = _ui_sig
-        # 本次为交互变更，直接返回（不sleep）
-    else:
-        # 无交互发生，进入自动拉取模式：sleep后自动重跑
-        import time as _time
-        _time.sleep(interval)
-        st.rerun()
+# 用客户端JS定时刷新，不阻塞后端线程，降低反向代理/网关 503 风险
+components.html(
+    f"""
+    <script>
+    setTimeout(function() {{ window.parent.location.reload(); }}, {interval * 1000});
+    </script>
+    """,
+    height=0,
+)
 
 # 添加全局CSS，强力覆盖expander内容区的gap，只保留一处，放在文件最后
 st.markdown("""

@@ -366,7 +366,13 @@ async def on_new_message(event):
         return
 
     message = event.raw_text
-    timestamp = datetime.datetime.now()
+    # 统一使用 Telegram 消息本身的时间（UTC），如缺失则退化为当前UTC
+    try:
+        evt_msg = getattr(event, 'message', None)
+        evt_dt = getattr(evt_msg, 'date', None)
+    except Exception:
+        evt_dt = None
+    timestamp = _to_utc_naive(evt_dt or datetime.datetime.utcnow())
     
     # 解析消息
     parsed_data = parse_message(message)
@@ -510,7 +516,7 @@ async def backfill_channel(channel_username: str):
             parsed['channel'] = uname
             if should_drop_by_rules(uname, parsed):
                 continue
-            ts = getattr(msg, 'date', None) or datetime.datetime.utcnow()
+            ts = _to_utc_naive(getattr(msg, 'date', None) or datetime.datetime.utcnow())
             with Session(engine) as session:
                 r = upsert_message_by_links(session, parsed, ts)
                 if r == 'updated':
@@ -575,3 +581,13 @@ if __name__ == "__main__":
     else:
         import asyncio
         asyncio.run(start_monitoring())
+
+
+def _to_utc_naive(dt: datetime.datetime) -> datetime.datetime:
+    """将任意datetime统一为“UTC无tzinfo”的标准形式，便于数据库一致存储。"""
+    if dt is None:
+        return datetime.datetime.utcnow()
+    if getattr(dt, 'tzinfo', None) is not None:
+        return dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+    # 认为是无tz的UTC时间
+    return dt
