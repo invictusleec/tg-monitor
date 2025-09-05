@@ -378,7 +378,8 @@ async def on_new_message(event):
         return
 
     message = event.raw_text
-    timestamp = datetime.datetime.now()
+    # 在处理新消息处，统一使用UTC时间
+    timestamp = datetime.datetime.utcnow()
     
     # 解析消息
     parsed_data = parse_message(message)
