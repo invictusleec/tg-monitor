@@ -1,15 +1,35 @@
 import os
 import subprocess
+from pathlib import Path
+
+ENV_FILE = os.environ.get("ENV_FILE", "/data/.env")
 
 REQUIRED = [
     "TELEGRAM_API_ID",
     "TELEGRAM_API_HASH",
     "DATABASE_URL",
-    "POSTGRES_USER",
-    "POSTGRES_PASSWORD",
-    "POSTGRES_DB",
     "DEFAULT_CHANNELS",
 ]
+
+
+def load_env_from_file(path: str):
+    p = Path(path)
+    if not p.exists():
+        return
+    with p.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            # Do not overwrite already-set envs from platform
+            os.environ.setdefault(k.strip(), v.strip())
+
+
+# 先尝试从 /data/.env 加载（支持先部署，后在网页里配置）
+load_env_from_file(ENV_FILE)
 
 missing = [k for k in REQUIRED if not os.environ.get(k)]
 
@@ -21,8 +41,8 @@ if missing:
     subprocess.run(cmd, check=False)
 else:
     # 环境齐全：初始化并并行启动监控、前台（可选后台）
-    args = os.environ.get("RUN_MODE", "full")  # full / ui
-    if args == "ui":
+    run_mode = os.environ.get("RUN_MODE", "full")  # full / ui
+    if run_mode == "ui":
         subprocess.run([
             "bash", "-lc",
             "streamlit run web.py --server.port 8501 --server.address 0.0.0.0"
