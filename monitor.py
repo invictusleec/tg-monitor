@@ -341,7 +341,7 @@ def upsert_message_by_links(session: Session, parsed_data: dict, timestamp: date
             return "updated"
 
     # 无链接或未命中：插入新消息
-    new_message = Message(timestamp=timestamp, **parsed_data)
+    new_message = Message(timestamp=timestamp, created_at=timestamp, **parsed_data)
     session.add(new_message)
     session.commit()
     print("✅ 新消息已保存（无重复链接）")

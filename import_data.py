@@ -70,7 +70,8 @@ def import_from_file(file_path, channel_name='imported_data'):
                     links={'quark': parsed['link']},
                     tags=['导入数据'],
                     source='file_import',
-                    timestamp=datetime.datetime.utcnow()
+                    timestamp=datetime.datetime.utcnow(),
+                    created_at=datetime.datetime.utcnow()
                 )
                 
                 session.add(message)
@@ -156,7 +157,8 @@ def create_sample_data():
                     links=data['links'],
                     tags=data['tags'],
                     source='sample_data',
-                    timestamp=datetime.datetime.utcnow()
+                    timestamp=datetime.datetime.utcnow(),
+                    created_at=datetime.datetime.utcnow()
                 )
                 
                 session.add(message)

@@ -421,14 +421,14 @@ def import_from_txt(input_path: str):
                             link_index[u] = target.id
                     else:
                         # 异常情况：索引存在但找不到记录，走插入
-                        m = Message(timestamp=ts, **parsed)
+                        m = Message(timestamp=ts, created_at=ts, **parsed)
                         batch_add.append(m)
                         for u in urls:
                             link_index[u] = -1  # 占位，commit后更新
                         inserted += 1
                 else:
                     # 插入路径
-                    m = Message(timestamp=ts, **parsed)
+                    m = Message(timestamp=ts, created_at=ts, **parsed)
                     batch_add.append(m)
                     for u in urls:
                         link_index[u] = -1

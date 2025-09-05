@@ -208,7 +208,7 @@ def upsert_message_by_links(session: Session, parsed_data: dict, timestamp: date
             print(f"♻️ 已覆盖更新现有消息(id={target.id})，按链接去重")
             return "updated"
 
-    new_message = Message(timestamp=timestamp, **parsed_data)
+    new_message = Message(timestamp=timestamp, created_at=timestamp, **parsed_data)
     session.add(new_message)
     session.commit()
     print("✅ 新消息已保存（无重复链接）")
