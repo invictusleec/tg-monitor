@@ -84,6 +84,18 @@ RULES_CACHE = {}
 IS_PAUSED = False
 CONTROL_FILE = "monitor_control.json"
 
+# 新增：自动加入频道所需的导入
+from telethon.tl.functions.channels import JoinChannelRequest
+from telethon.errors import (
+    FloodWaitError,
+    UsernameInvalidError,
+    UsernameNotOccupiedError,
+    ChannelPrivateError,
+    UserAlreadyParticipantError,
+)
+import asyncio as _asyncio
+
+
 def load_control_state():
     """从控制文件读取 paused 状态，变化时打印提示"""
     global IS_PAUSED
@@ -407,6 +419,39 @@ async def bind_channels():
     # 若频道无变化则跳过
     if set(new_channels) == set(current_channels):
         return
+
+    # 在绑定事件前，尝试自动加入公开频道（若已加入会抛出 UserAlreadyParticipantError，直接忽略）
+    async def _ensure_join_all(chs):
+        for uname in chs:
+            u = (uname or '').lstrip('@').strip()
+            if not u:
+                continue
+            try:
+                entity = await client.get_entity(u)
+                try:
+                    await client(JoinChannelRequest(entity))
+                    print(f"📥 已尝试加入频道 @{u}")
+                except UserAlreadyParticipantError:
+                    # 已经在频道中，忽略
+                    pass
+                except ChannelPrivateError:
+                    print(f"🚫 无法加入私有频道 @{u}（需要邀请链接）")
+                except FloodWaitError as fe:
+                    wait_s = getattr(fe, 'seconds', 5)
+                    print(f"⏳ 频率限制，等待 {wait_s}s 后继续加入 @{u}")
+                    await _asyncio.sleep(wait_s + 1)
+                except Exception as e:
+                    print(f"⚠️ 加入频道 @{u} 失败: {e}")
+            except (UsernameInvalidError, UsernameNotOccupiedError):
+                print(f"❓ 无效或不存在的频道用户名: @{u}")
+            except Exception as e:
+                print(f"⚠️ 解析频道实体失败 @{u}: {e}")
+
+    try:
+        await _ensure_join_all(new_channels)
+    except Exception as e:
+        print(f"⚠️ 自动加入频道过程中发生错误: {e}")
+
     # 先移除旧事件绑定
     if current_event_builder is not None:
         try:
